@@ -109,12 +109,12 @@ int_t spool_check(stringer_t *path) {
  * @brief	Create a temporary file in a specified spool directory.
  * @note	The temp file is automatically unlinked as soon as it is created.
  * @param	spool	the spool directory id in which the temp file will be stored (MAGMA_SPOOL_BASE, MAGMA_SPOOL_DATA, or MAGMA_SPOOL_SCAN).
- * @param	prefix	an optional prefix for the temp file name ("magma" will be used if prefix is NULL0.
+ * @param	prefix	an optional prefix for the temp file name ("magma" will be used if prefix is NULL).
  * @return	-1 on failure or the file descriptor to the newly created temp file on success.
  */
 int_t spool_mktemp(int_t spool, chr_t *prefix) {
 
-	int_t fd;
+	int_t fd = -1;
 	time_t now;
 	stringer_t *path, *template, *base = NULL;
 
@@ -129,8 +129,8 @@ int_t spool_mktemp(int_t spool, chr_t *prefix) {
 	if ((path = spool_path(spool)) && (template = st_aprint("%.*s%s_%lu_%lu_XXXXXX", st_length_int(path), st_char_get(path), prefix, thread_get_thread_id(), _rand_get_uint64()))
 		&& (fd = mkostemp(st_char_get(template), O_EXCL | O_CREAT | O_RDWR | O_SYNC | O_NOATIME)) < 0) {
 
-		// Verify that the spool directory directory tree is valid. If any of the directories are missing, this will try and create them.
-		if ((base = spool_path(MAGMA_SPOOL_BASE)) && !spool_check(base) && !spool_check(path)) {
+		// try again if both directories exist or we manage to create them now
+		if ((base = spool_path(MAGMA_SPOOL_BASE)) && (spool_check(base) >= 0) && (spool_check(path) >= 0)) {
 
 			// We need to generate a new file template since the first mkstemp may have overwritten the required X characters.
 			st_free(template);
